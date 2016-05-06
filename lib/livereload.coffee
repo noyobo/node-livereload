@@ -5,6 +5,7 @@ http  = require 'http'
 https = require 'https'
 url = require 'url'
 chokidar = require 'chokidar'
+EventEmitter = require 'events'
 
 protocol_version = '1.6'
 defaultPort = 35729
@@ -37,6 +38,8 @@ class Server
     @config.overrideURL ?= ''
 
     @config.usePolling ?= false
+    
+    @emitter = new EventEmitter()
 
   listen: ->
     @debug "LiveReload is waiting for browser to connect."
@@ -62,11 +65,14 @@ class Server
     # FIXME: This doesn't seem to be firing either.
     socket.on 'error', (err) =>
       @debug "Error in client socket: #{err}"
+    
+    @emitter.emit('connection', socket)
 
 
   # FIXME: This does not seem to be firing
   onClose: (socket) ->
     @debug "Browser disconnected."
+    @emitter.emit('close')
 
   watch: (paths) ->
     @watcher = chokidar.watch paths, {ignoreInitial: true, ignored: @config.exclusions, usePolling: @config.usePolling}
@@ -97,6 +103,8 @@ class Server
       socket.send data, (error) =>
         if error
           @debug error
+        else
+          @emitter.emit 'refresh', filepath
 
   debug: (str) ->
     if @config.debug
