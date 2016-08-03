@@ -51,12 +51,20 @@ runner = ->
       required: false,
       value: true
     }
+    {
+      short: "w"
+      long: "wait"
+      description: "delay message of file system changes to browser by `delay` milliseconds"
+      required: false
+      value: true
+    }
   ].reverse(), true
 
   port = opts.get('port') || 35729
-  exclusions = opts.get('exclusions') || []
+  exclusions = if opts.get('exclusions') then opts.get('exclusions' ).split(',' ).map((s) -> new RegExp(s)) else []
   exts = (opts.get('exts') || '').split ' '
   usePolling = opts.get('usepolling') || false
+  wait = opts.get('wait') || 0;
 
   server = livereload.createServer({
     port: port
@@ -64,9 +72,12 @@ runner = ->
     exclusions: exclusions,
     exts: exts
     usePolling: usePolling
+    delay: wait
   })
 
-  path = resolve(process.argv[2] || '.')
+  path = (process.argv[2] || '.')
+    .split(/\s*,\s*/)
+    .map((x)->resolve(x))
   console.log "Starting LiveReload v#{version} for #{path} on port #{port}."
   server.watch(path)
 

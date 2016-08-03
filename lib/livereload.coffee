@@ -75,18 +75,32 @@ class Server
     @emitter.emit('close')
 
   watch: (paths) ->
-    @watcher = chokidar.watch paths, {ignoreInitial: true, ignored: @config.exclusions, usePolling: @config.usePolling}
-    @watcher.on 'add', (path) => @filterRefresh path
-    @watcher.on 'change', (path) => @filterRefresh path
-    @watcher.on 'unlink', (path) => @filterRefresh path
+    @watcher = chokidar.watch(paths,
+      ignoreInitial: true
+      ignored: @config.exclusions
+      usePolling: @config.usePolling
+    )
+    .on 'add', @filterRefresh.bind(@)
+    .on 'change', @filterRefresh.bind(@)
+    .on 'unlink', @filterRefresh.bind(@)
+
 
   filterRefresh: (filepath) ->
     exts = @config.exts
     fileext = path.extname filepath
                   .substring 1
-    for ext in exts when ext == fileext
-      @refresh filepath
-      break
+
+    # check if file extension is supposed to be watched
+    if (exts.indexOf(fileext) != -1)
+      if @config.delay
+        delayedRefresh = setTimeout(
+          =>
+            clearTimeout(delayedRefresh)
+            @refresh filepath
+          @config.delay
+        )
+      else
+        @refresh filepath
 
   refresh: (filepath) ->
     @debug "Refresh: #{filepath}"
@@ -109,6 +123,12 @@ class Server
   debug: (str) ->
     if @config.debug
       console.log "#{str}\n"
+
+  close: ->
+    @watcher.close()
+    # ensure ws server is closed
+    @server._server.close()
+    @server.close()
 
 exports.createServer = (config = {}) ->
   requestHandler = ( req, res )->
